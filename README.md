@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ForgeCal API
 
-## Getting Started
+Calendly-style scheduling backend for ForgeWeb with Google auth, Google Meet, custom email, and webhook support.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router + TypeScript
+- Auth.js (Google OAuth)
+- Google Calendar API (freebusy + event + Meet link)
+- Prisma + Neon Postgres
+- Tailwind + shadcn-style UI
+
+## 1. Setup
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Fill `.env`:
+
+- `DATABASE_URL` (Neon)
+- `NEXTAUTH_URL`
+- `NEXTAUTH_SECRET`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `RESEND_API_KEY` (for custom emails)
+- `EMAIL_FROM` (verified sender)
+
+Google OAuth redirect URIs:
+
+- `http://localhost:3000/api/auth/callback/google`
+- `https://forge-cal.vercel.app/api/auth/callback/google`
+
+## 2. Database
+
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+## 3. Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 4. Public API for ForgeWeb
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Use `x-api-key` in every request.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Event types
 
-## Learn More
+```bash
+curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/public/event-types
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Widget config (embed contract)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+curl -H "x-api-key: YOUR_KEY" "http://localhost:3000/api/public/widget-config?slug=strategy-call"
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Availability
 
-## Deploy on Vercel
+```bash
+curl -H "x-api-key: YOUR_KEY" "http://localhost:3000/api/public/availability?slug=strategy-call&date=2026-02-18"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Create booking
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Note: booking endpoint currently requires guest to use a Google email (`gmail.com` or `googlemail.com`).
+
+```bash
+curl -X POST http://localhost:3000/api/public/bookings \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_KEY" \
+  -d '{
+    "slug": "strategy-call",
+    "guestName": "John Doe",
+    "guestEmail": "john.doe@gmail.com",
+    "startTime": "2026-02-18T15:00:00.000Z",
+    "timezone": "UTC",
+    "guestMessage": "Looking to discuss project scope"
+  }'
+```
+
+Response includes `meetingUrl` when confirmed.
+
+### Cancel booking
+
+```bash
+curl -X POST http://localhost:3000/api/public/bookings/BOOKING_ID/cancel \
+  -H "x-api-key: YOUR_KEY"
+```
+
+### Register/list webhook targets
+
+```bash
+curl -X POST http://localhost:3000/api/public/webhooks \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_KEY" \
+  -d '{"url":"https://forgewwb-lemon.vercel.app/api/forgecal/webhook","secret":"your-long-shared-secret"}'
+
+curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/public/webhooks
+```
+
+Outgoing webhook headers:
+
+- `x-forgecal-event`
+- `x-forgecal-signature` (HMAC SHA256 over raw JSON body using webhook secret)
+
+Events:
+
+- `booking.created`
+- `booking.confirmed`
+- `booking.canceled`
+
+## 5. What is implemented
+
+1. Google Meet link auto-created through Google Calendar `conferenceData`
+2. Custom confirmation/cancellation email via Resend
+3. ForgeWeb embed contract endpoint + CORS for your domains
+4. Webhooks for booking lifecycle events
+
+## 6. Deploy on Vercel
+
+- Add all env vars from `.env` to Vercel project settings.
+- Set `NEXTAUTH_URL=https://forge-cal.vercel.app` in production.
+- Redeploy after env changes.
