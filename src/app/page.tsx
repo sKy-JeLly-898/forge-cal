@@ -156,7 +156,8 @@ export default async function Home() {
       ) : null}
 
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pb-10 text-sm text-slate-600 md:px-6">
-        <p>ForgeCal by ForgeWeb</p>
+        <p>ForgeCal by <Link className="text-[#009966]" href="https://forgeweb-lemon.vercel.app">
+        ForgeWeb</Link></p>
         <div className="flex items-center gap-4">
           <Link href="/privacy-policy" className="underline">
             Privacy Policy

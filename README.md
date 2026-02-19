@@ -1,6 +1,6 @@
 # ForgeCal API
 
-Calendly-style scheduling backend for ForgeWeb with Google auth, Google Meet, custom email, and webhook support.
+Calendly-style scheduling backend for ForgeWeb with Google auth, Google Meet, and webhook support.
 
 ## Stack
 
@@ -24,8 +24,6 @@ Fill `.env`:
 - `NEXTAUTH_SECRET`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `RESEND_API_KEY` (for custom emails)
-- `EMAIL_FROM` (verified sender)
 
 Google OAuth redirect URIs:
 
@@ -100,7 +98,7 @@ curl -X POST http://localhost:3000/api/public/bookings/BOOKING_ID/cancel \
 curl -X POST http://localhost:3000/api/public/webhooks \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_KEY" \
-  -d '{"url":"https://forgewwb-lemon.vercel.app/api/forgecal/webhook","secret":"your-long-shared-secret"}'
+  -d '{"url":"https://forgewwb-lemon.vercel.app/api/forgecal/webhook"}'
 
 curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/public/webhooks
 ```
@@ -116,12 +114,16 @@ Events:
 - `booking.confirmed`
 - `booking.canceled`
 
+Email handling:
+
+- ForgeCal does not send customer emails.
+- Client sites should send their own confirmation/cancellation emails based on webhook events.
+
 ## 5. What is implemented
 
 1. Google Meet link auto-created through Google Calendar `conferenceData`
-2. Custom confirmation/cancellation email via Resend
-3. ForgeWeb embed contract endpoint + CORS for your domains
-4. Webhooks for booking lifecycle events
+2. ForgeWeb embed contract endpoint + CORS for your domains
+3. Webhooks for booking lifecycle events
 
 ## 6. Deploy on Vercel
 

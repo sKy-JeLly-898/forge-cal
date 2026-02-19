@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { createGoogleCalendarEvent } from "@/lib/google-calendar";
 import { getApiKeyOwner } from "@/lib/api-auth";
-import { sendBookingEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { computeAvailableSlots } from "@/lib/scheduling";
 import { withCors, preflightResponse } from "@/lib/cors";
@@ -142,17 +141,6 @@ export async function POST(request: Request) {
         externalEventId,
         meetingUrl,
       },
-    });
-
-    await sendBookingEmail({
-      to: booking.guestEmail,
-      guestName: booking.guestName,
-      eventName: eventType.name,
-      start: booking.startTime,
-      end: booking.endTime,
-      timezone: eventType.timezone,
-      meetingUrl,
-      organizerEmail: owner.user.email,
     });
   } catch {
     await prisma.booking.update({

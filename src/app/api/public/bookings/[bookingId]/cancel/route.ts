@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { getApiKeyOwner } from "@/lib/api-auth";
 import { preflightResponse, withCors } from "@/lib/cors";
-import { sendBookingCanceledEmail } from "@/lib/email";
 import { cancelGoogleCalendarEvent } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 import { sendBookingWebhook } from "@/lib/webhooks";
@@ -60,15 +59,6 @@ export async function POST(
       guestEmail: booking.guestEmail,
       canceledAt: canceled.canceledAt?.toISOString(),
     },
-  });
-
-  await sendBookingCanceledEmail({
-    to: booking.guestEmail,
-    guestName: booking.guestName,
-    eventName: booking.eventType.name,
-    start: booking.startTime,
-    timezone: booking.eventType.timezone,
-    organizerEmail: owner.user.email,
   });
 
   return withCors(request, NextResponse.json({ status: "CANCELED" }));
