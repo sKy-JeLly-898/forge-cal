@@ -74,7 +74,7 @@ model EventType {
   id              String   @id @default(cuid())
   userId          String
   name            String
-  slug            String   @unique
+  slug            String
   description     String?
   durationMinutes Int      @default(30)
   slotIntervalMin Int      @default(30)
@@ -90,6 +90,7 @@ model EventType {
   bookings Booking[]
 
   @@index([userId])
+  @@unique([userId, slug])
 }
 
 model AvailabilityWindow {
@@ -183,6 +184,10 @@ model ApiRequestLog {
   userId    String
   endpoint  String
   method    String
+  originHost String?
+  refererHost String?
+  siteHint  String?
+  userAgent String?
   createdAt DateTime @default(now())
 
   apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
@@ -190,6 +195,8 @@ model ApiRequestLog {
 
   @@index([userId, createdAt])
   @@index([apiKeyId, createdAt])
+  @@index([originHost, createdAt])
+  @@index([siteHint, createdAt])
 }
 
 enum BookingStatus {

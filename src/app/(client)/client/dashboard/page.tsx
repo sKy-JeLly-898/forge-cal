@@ -1,8 +1,12 @@
 import { format } from "date-fns";
-import Link from "next/link";
 
 import { auth } from "@/auth";
-import { createClientApiKeyAction, revokeClientApiKeyAction } from "@/app/(client)/client/dashboard/actions";
+import {
+  createClientApiKeyAction,
+  createClientEventTypeAction,
+  createClientWebhookAction,
+  revokeClientApiKeyAction,
+} from "@/app/(client)/client/dashboard/actions";
 import { SignOutButton } from "@/app/(app)/dashboard/signout-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 export default async function ClientDashboardPage() {
   const session = await auth();
 
-  const [clientAccount, apiKeys, bookings, eventTypes] = await Promise.all([
+  const [clientAccount, apiKeys, bookings, eventTypes, webhooks] = await Promise.all([
     prisma.clientAccount.findUnique({
       where: { userId: session!.user.id },
     }),
@@ -28,6 +32,10 @@ export default async function ClientDashboardPage() {
       take: 12,
     }),
     prisma.eventType.findMany({
+      where: { userId: session!.user.id, isActive: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.webhookEndpoint.findMany({
       where: { userId: session!.user.id, isActive: true },
       orderBy: { createdAt: "desc" },
     }),
@@ -119,6 +127,51 @@ export default async function ClientDashboardPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Create Event Type</CardTitle>
+          <CardDescription>Create your own meeting type and timezone. Default availability is Mon-Fri, 9:00-17:00.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={createClientEventTypeAction} className="grid gap-3 md:grid-cols-2">
+            <input name="name" required placeholder="Strategy call" className="h-10 rounded-md border border-slate-300 px-3 text-sm md:col-span-2" />
+            <input
+              name="timezone"
+              required
+              defaultValue="UTC"
+              placeholder="America/New_York"
+              className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+            />
+            <input
+              name="durationMinutes"
+              required
+              type="number"
+              min={15}
+              max={180}
+              defaultValue={30}
+              className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+            />
+            <input
+              name="slotIntervalMin"
+              required
+              type="number"
+              min={15}
+              max={120}
+              defaultValue={30}
+              className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+            />
+            <textarea
+              name="description"
+              placeholder="What this meeting is about"
+              className="min-h-20 rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2"
+            />
+            <div className="md:col-span-2">
+              <Button type="submit">Create Event Type</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Integration Endpoints</CardTitle>
           <CardDescription>Use these with your generated key in `x-api-key` header.</CardDescription>
         </CardHeader>
@@ -134,7 +187,7 @@ export default async function ClientDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Active Event Types</CardTitle>
-          <CardDescription>Create event types with your admin or ask support for setup.</CardDescription>
+          <CardDescription>Your active meeting types available for public booking.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {eventTypes.length === 0 ? <p className="text-sm text-slate-500">No active event types yet.</p> : null}
@@ -144,14 +197,42 @@ export default async function ClientDashboardPage() {
                 <div>
                   <p className="text-sm font-medium text-slate-900">{eventType.name}</p>
                   <p className="font-mono text-xs text-slate-500">slug: {eventType.slug}</p>
+                  <p className="text-xs text-slate-500">timezone: {eventType.timezone}</p>
                 </div>
                 <Badge>active</Badge>
               </div>
             </div>
           ))}
-          <Link href="mailto:forgeweb90@gmail.com?subject=Need event type setup" className="text-sm text-emerald-700 underline">
-            Request event type configuration
-          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Webhooks</CardTitle>
+          <CardDescription>
+            Add your webhook URL only. ForgeCal auto-generates a secret key for you; copy that secret into your receiving app.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form action={createClientWebhookAction} className="flex gap-3">
+            <input
+              name="url"
+              type="url"
+              required
+              placeholder="https://your-site.com/api/forgecal-webhook"
+              className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm"
+            />
+            <Button type="submit">Add Webhook</Button>
+          </form>
+          <div className="space-y-3">
+            {webhooks.length === 0 ? <p className="text-sm text-slate-500">No webhooks configured.</p> : null}
+            {webhooks.map((webhook) => (
+              <div key={webhook.id} className="rounded-md border border-slate-200 p-3">
+                <p className="text-sm font-medium text-slate-800">{webhook.url}</p>
+                <p className="mt-1 font-mono text-xs text-slate-500">secret: {webhook.secret}</p>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

@@ -11,10 +11,6 @@ import { prisma } from "@/lib/prisma";
 
 const createEventTypeSchema = z.object({
   name: z.string().min(2),
-  slug: z
-    .string()
-    .min(2)
-    .regex(/^[a-z0-9-]+$/, "Use lowercase letters, numbers, and dashes only."),
   durationMinutes: z.coerce.number().int().min(15).max(180),
   slotIntervalMin: z.coerce.number().int().min(15).max(120),
   timezone: z.string().min(1),
@@ -54,6 +50,41 @@ async function requireSuperAdmin() {
   }
 
   return session;
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
+
+async function getUniqueEventTypeSlug(userId: string, name: string) {
+  const baseSlug = slugify(name) || "meeting";
+  let candidate = baseSlug;
+  let suffix = 2;
+
+  // Ensure uniqueness per user.
+  while (true) {
+    const existing = await prisma.eventType.findFirst({
+      where: {
+        userId,
+        slug: candidate,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
 }
 
 export async function createApiKeyAction(formData: FormData) {
@@ -100,7 +131,6 @@ export async function createEventTypeAction(formData: FormData) {
 
   const parsed = createEventTypeSchema.safeParse({
     name: formData.get("name"),
-    slug: formData.get("slug"),
     durationMinutes: formData.get("durationMinutes"),
     slotIntervalMin: formData.get("slotIntervalMin"),
     timezone: formData.get("timezone"),
@@ -111,10 +141,13 @@ export async function createEventTypeAction(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message || "Invalid form data");
   }
 
+  const slug = await getUniqueEventTypeSlug(session.user.id, parsed.data.name);
+
   await prisma.eventType.create({
     data: {
       userId: session.user.id,
       ...parsed.data,
+      slug,
     },
   });
 

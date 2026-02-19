@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
   url: z.string().url(),
-  secret: z.string().min(16),
+  secret: z.string().min(16).optional(),
 });
 
 export async function GET(request: Request) {
@@ -47,12 +48,13 @@ export async function POST(request: Request) {
     data: {
       userId: owner.user.id,
       url: parsed.data.url,
-      secret: parsed.data.secret,
+      secret: parsed.data.secret ?? randomBytes(24).toString("hex"),
       isActive: true,
     },
     select: {
       id: true,
       url: true,
+      secret: true,
       isActive: true,
       createdAt: true,
     },

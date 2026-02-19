@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "lucide-react";
 
 const plans = [
   {
@@ -43,7 +44,9 @@ export default async function Home() {
       <section className="mx-auto max-w-6xl px-4 pb-12 pt-8 md:px-6 md:pt-12">
         <header className="mb-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-emerald-600" />
+            <div className="h-9 w-9 rounded-lg bg-emerald-600 flex items-center justify-center">
+  <Calendar className="h-5 w-5 text-white" />
+</div>
             <p className="text-lg font-semibold text-slate-900">ForgeCal</p>
           </div>
           {session?.user ? (

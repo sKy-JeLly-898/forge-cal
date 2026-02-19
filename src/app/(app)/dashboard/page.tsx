@@ -1,4 +1,4 @@
-import { format, subDays } from "date-fns";
+import { format, formatDistanceToNow, subDays } from "date-fns";
 
 import {
   createClientAccountAction,
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
 
   const clientUserIds = clientAccounts.map((account) => account.userId).filter((id): id is string => Boolean(id));
 
-  const [activeKeyCounts, totalKeyCounts, usageCounts] = await Promise.all([
+  const [activeKeyCounts, totalKeyCounts, usageCounts, apiUsageLogs, clientApiKeys] = await Promise.all([
     prisma.apiKey.groupBy({
       by: ["userId"],
       where: { userId: { in: clientUserIds }, revokedAt: null },
@@ -50,11 +50,59 @@ export default async function DashboardPage() {
       where: { userId: { in: clientUserIds }, createdAt: { gte: thirtyDaysAgo } },
       _count: { _all: true },
     }),
+    prisma.apiRequestLog.findMany({
+      where: {
+        userId: { in: clientUserIds },
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      select: {
+        userId: true,
+        apiKeyId: true,
+        originHost: true,
+        refererHost: true,
+        siteHint: true,
+        endpoint: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5000,
+    }),
+    prisma.apiKey.findMany({
+      where: { userId: { in: clientUserIds } },
+      select: {
+        id: true,
+        userId: true,
+        label: true,
+      },
+    }),
   ]);
 
   const activeKeyCountMap = new Map(activeKeyCounts.map((item) => [item.userId, item._count._all]));
   const totalKeyCountMap = new Map(totalKeyCounts.map((item) => [item.userId, item._count._all]));
   const usageCountMap = new Map(usageCounts.map((item) => [item.userId, item._count._all]));
+  const apiKeyLabelMap = new Map(clientApiKeys.map((key) => [key.id, key.label]));
+
+  const siteUsageByUser = new Map<string, Map<string, number>>();
+  const latestUsageByUser = new Map<
+    string,
+    { site: string; endpoint: string; apiKeyLabel: string; createdAt: Date }
+  >();
+
+  for (const log of apiUsageLogs) {
+    const site = log.siteHint || log.originHost || log.refererHost || "unknown";
+    const userMap = siteUsageByUser.get(log.userId) ?? new Map<string, number>();
+    userMap.set(site, (userMap.get(site) ?? 0) + 1);
+    siteUsageByUser.set(log.userId, userMap);
+
+    if (!latestUsageByUser.has(log.userId)) {
+      latestUsageByUser.set(log.userId, {
+        site,
+        endpoint: log.endpoint,
+        apiKeyLabel: apiKeyLabelMap.get(log.apiKeyId) ?? "unknown key",
+        createdAt: log.createdAt,
+      });
+    }
+  }
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl space-y-6 px-4 py-8 md:px-6">
@@ -118,6 +166,12 @@ export default async function DashboardPage() {
             const activeKeyCount = account.userId ? (activeKeyCountMap.get(account.userId) ?? 0) : 0;
             const totalKeyCount = account.userId ? (totalKeyCountMap.get(account.userId) ?? 0) : 0;
             const usage30d = account.userId ? (usageCountMap.get(account.userId) ?? 0) : 0;
+            const topSites = account.userId
+              ? Array.from(siteUsageByUser.get(account.userId)?.entries() ?? [])
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 3)
+              : [];
+            const latestUsage = account.userId ? latestUsageByUser.get(account.userId) : null;
             return (
               <div key={account.id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -160,6 +214,16 @@ export default async function DashboardPage() {
                 <p className="mt-1 text-xs text-slate-500">
                   API keys made: {totalKeyCount} | Active keys: {activeKeyCount} | API calls (30d): {usage30d}
                 </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Sites using this API:{" "}
+                  {topSites.length > 0 ? topSites.map(([site, count]) => `${site} (${count})`).join(", ") : "No source site data yet"}
+                </p>
+                {latestUsage ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Latest API hit: {latestUsage.site} {"->"} {latestUsage.endpoint} using key ({latestUsage.apiKeyLabel}){" "}
+                    {formatDistanceToNow(latestUsage.createdAt, { addSuffix: true })}
+                  </p>
+                ) : null}
               </div>
             );
           })}

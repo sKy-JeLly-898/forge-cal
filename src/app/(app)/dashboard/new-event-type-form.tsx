@@ -13,11 +13,6 @@ export function NewEventTypeForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="slug">Slug</Label>
-        <Input id="slug" name="slug" placeholder="strategy-call" required />
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor="timezone">Timezone</Label>
         <Input id="timezone" name="timezone" placeholder="America/New_York" required defaultValue="UTC" />
       </div>
